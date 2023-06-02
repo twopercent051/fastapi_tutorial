@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import select, and_, or_, func, insert
+from sqlalchemy import select, and_, or_, func, insert, delete
 
 from app.bookings.models import Bookings
 from app.dao.base import BaseDAO
@@ -13,16 +13,15 @@ class BookingDAO(BaseDAO):
 
     @classmethod
     async def add(cls, user_id: int, room_id: int, date_from: date, date_to: date):
-        """
-        WITH booked_rooms AS (
-            SELECT * FROM bookings
-            WHERE room_id = 1 AND
-            (date_from >= '2023-05-15' AND date_from <= '2023-06-20') OR
-            (date_from <= '2023-05-15' AND date_to > '2023-06-20')
-        )
-        """
         async with async_session_maker() as session:
-
+            """
+            WITH booked_rooms AS (
+                SELECT * FROM bookings
+                WHERE room_id = 1 AND
+                (date_from >= '2023-05-15' AND date_from <= '2023-06-20') OR
+                (date_from <= '2023-05-15' AND date_to > '2023-06-20')
+            )
+            """
             booked_rooms = select(Bookings.__table__.columns).where(
                 and_(
                     Bookings.room_id == room_id,
@@ -73,3 +72,52 @@ class BookingDAO(BaseDAO):
                 return new_booking
             else:
                 return None
+
+    @classmethod
+    async def get_bookings_by_user(cls, user_id: int) -> list:
+        async with async_session_maker() as session:
+            """
+            WITH booked_rooms AS (
+                SELECT * FROM bookings
+                WHERE user_id = 1
+            )
+            """
+            booked_rooms = select(Bookings.__table__.columns).where(Bookings.user_id == user_id)
+            """
+            SELECT 
+                booked_rooms.room_id,
+                booked_rooms.user_id,
+                booked_rooms.date_from,
+                booked_rooms.date_to,
+                booked_rooms.price,
+                booked_rooms.total_cost,
+                booked_rooms.total_days,
+                rooms.image_id,
+                rooms.name,
+                rooms.description,
+                rooms.services
+                FROM booked_rooms LEFT JOIN rooms ON rooms.id = booked_rooms.room_id;
+            """
+            user_bookings = select(
+                booked_rooms.c.id,
+                booked_rooms.c.user_id,
+                booked_rooms.c.date_from,
+                booked_rooms.c.date_to,
+                booked_rooms.c.price,
+                booked_rooms.c.total_cost,
+                booked_rooms.c.total_days,
+                Rooms.image_id,
+                Rooms.name,
+                Rooms.description,
+                Rooms.services
+            ).select_from(booked_rooms).join(Rooms, booked_rooms.c.room_id == Rooms.id)
+            get_user_bookings = await session.execute(user_bookings)
+            get_user_bookings: list = get_user_bookings.mappings().all()
+            return get_user_bookings
+
+    @classmethod
+    async def drop_by_id(cls, booking_id: int, user_id: int):
+        async with async_session_maker() as session:
+            stmt = delete(Bookings).filter_by(id=booking_id, user_id=user_id)
+            await session.execute(stmt)
+            await session.commit()

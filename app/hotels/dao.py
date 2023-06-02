@@ -14,14 +14,14 @@ class HotelDAO(BaseDAO):
 
     @classmethod
     async def find_free_by_location(cls, location: str, date_from: date, date_to: date):
-        """
-        WITH booked_rooms AS (
-            SELECT * FROM bookings
-            (date_from >= '2023-05-15' AND date_from <= '2023-06-20') OR
-            (date_from <= '2023-05-15' AND date_to > '2023-06-20')
-        )
-        """
         async with async_session_maker() as session:
+            """
+                WITH booked_rooms AS (
+                    SELECT * FROM bookings
+                    (date_from >= '2023-05-15' AND date_from <= '2023-06-20') OR
+                    (date_from <= '2023-05-15' AND date_to > '2023-06-20')
+                )
+            """
             booked_rooms = select(Bookings.__table__.columns).where(
                 or_(
                     and_(
