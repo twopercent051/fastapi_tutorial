@@ -4,7 +4,7 @@ from sqlalchemy import select, and_, or_, func, insert
 
 from app.bookings.models import Bookings
 from app.dao.base import BaseDAO
-from app.database import async_session_maker
+from app.database import async_session_maker, engine
 from app.hotels.rooms.models import Rooms
 
 
@@ -23,7 +23,7 @@ class BookingDAO(BaseDAO):
         """
         async with async_session_maker() as session:
 
-            booked_rooms = select(Bookings).where(
+            booked_rooms = select(Bookings.__table__.columns).where(
                 and_(
                     Bookings.room_id == room_id,
                     or_(
@@ -38,6 +38,7 @@ class BookingDAO(BaseDAO):
                     )
                 )
             ).cte('booked_rooms')
+
             """
            SELECT rooms.quantity - COUNT(booked_rooms.room_id) FROM rooms
            LEFT JOIN booked_rooms ON booked_rooms.room_id = rooms.id
@@ -51,12 +52,13 @@ class BookingDAO(BaseDAO):
             ).where(Rooms.id == room_id).group_by(Rooms.quantity, booked_rooms.c.room_id)
 
             rooms_left = await session.execute(get_rooms_left)
-            rooms_left: int = rooms_left.scalar()
+            rooms_left: int = rooms_left.scalars().one_or_none()
+            # print(get_rooms_left.compile(engine, compile_kwargs={"literal_binds": True}))
 
             if rooms_left > 0:
                 get_price = select(Rooms.price).where(Rooms.id == room_id)
                 price = await session.execute(get_price)
-                price: int = price.scalar()
+                price: int = price.scalars().one_or_none()
                 add_bookings = insert(Bookings).values(
                     room_id=room_id,
                     user_id=user_id,
