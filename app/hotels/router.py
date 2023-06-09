@@ -1,6 +1,7 @@
 from datetime import date
 
 from fastapi import APIRouter
+from fastapi_cache.decorator import cache
 
 from app.hotels.dao import HotelDAO
 from app.hotels.schema import SHotels
@@ -12,6 +13,7 @@ router = APIRouter(
 
 
 @router.get('')
+@cache(expire=20)
 async def get_free_hotels(location: str, date_from: date, date_to: date):
     return await HotelDAO.find_free_by_location(location=location, date_from=date_from, date_to=date_to)
 
